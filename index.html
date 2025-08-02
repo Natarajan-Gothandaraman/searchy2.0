@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>YouTube Video Search</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
     body {
       font-family: 'Poppins', sans-serif;
       background: linear-gradient(120deg, #A50000, #FFD700);
       color: #333;
-      transition: background-color 0.3s ease, color 0.3s ease;
     }
-    h1, p {
-      color: white;
-    }
+    h1, p { color: white; }
     body.dark-mode {
       background: #1a1a2e;
       color: #f5f5f5;
@@ -28,256 +26,249 @@
       background-color: #282828;
       color: #f5f5f5;
     }
-    .video-thumbnail {
-      transition: transform 0.3s ease;
-    }
     .video-thumbnail:hover {
       transform: scale(1.03);
-    }
-    .dropdown:hover .dropdown-content {
-      display: block;
-    }
-
-    /* Responsive draggable modal */
-    .draggable {
-      touch-action: none;
-    }
-
-    #nightModeToggle {
-      position: relative;
-      top: 1rem;
-      right: 1rem;
-      z-index: 10;
-      background: #f5f5f5;
-      width: 40px;
-      height: 40px;
-      color: #333;
-      border-radius: 50%;
-      padding: 0.5rem;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-    #nightModeToggle:hover {
-      background: #ddd;
     }
   </style>
 </head>
 <body class="min-h-screen">
-  <div class="container mx-auto px-4 py-8">
-    <header class="mb-8 text-center relative">
-      <h1 class="text-3xl font-bold mb-2">YouTube Video Search</h1>
-      <p class="text-white-500">Search for videos without distractions</p>
-      <button id="nightModeToggle">🌙</button>
-    </header>
+<div class="container mx-auto px-4 py-8">
+  <header class="mb-8 text-center relative">
+    <h1 class="text-3xl font-bold mb-2">YouTube Video Search</h1>
+    <p class="text-white-500">Search for videos without distractions</p>
+  </header>
 
-    <div class="max-w-2xl mx-auto mb-8">
-      <div class="relative flex">
-        <input type="text" id="searchInput" placeholder="Search for videos..." class="w-full px-4 py-3 rounded-l-lg border-2 border-gray-300">
-        <button id="searchButton" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-r-lg">Search</button>
-      </div>
-    </div>
-
-    <div id="videoResults" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
-
-    <div id="loadMoreContainer" class="text-center mt-8">
-      <button id="loadMoreButton" class="bg-gray-800 hover:bg-black text-white px-6 py-3 rounded-lg hidden">Load More Videos</button>
+  <div class="max-w-2xl mx-auto mb-4">
+    <div class="flex">
+      <input type="text" id="searchInput" placeholder="Search for videos..." class="w-full px-4 py-3 rounded-l-lg border-2 border-gray-300">
+      <button id="searchButton" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-r-lg">Search</button>
     </div>
   </div>
 
-  <script>
-    const API_KEYS = ["AIzaSyD4C8Sdj0vIJkpPwFpnDeQKzme_JuDQg3o",
-            "AIzaSyBYWdAvKHDJcj5X-VBc-Ob4tKepRx9IAk8",
-            "AIzaSyBAXzH-FPMCNgbC6skfqP0scZREjALh4u0",
-            "AIzaSyAwtPbKNBMdL8jtWYqnEfDdXIrrzV20D8s"];
-    let currentApiIndex = 0, nextPageToken = '', currentQuery = '', currentSort = 'relevance';
-    let videoList = [], currentVideoIndex = -1, isMinimized = false;
+  <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
+    <button id="nightModeToggle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full">🌙</button>
+    <label for="sortSelect" class="text-white font-medium">Sort by:</label>
+    <select id="sortSelect" class="px-4 py-2 rounded border border-gray-300">
+      <option value="relevance">Relevance</option>
+      <option value="viewCount">Views</option>
+      <option value="date">Latest</option>
+      <option value="likes">Likes</option>
+      <option value="channel">Channel A-Z</option>
+    </select>
+  </div>
 
-    const searchInput = document.getElementById('searchInput');
-    const searchButton = document.getElementById('searchButton');
-    const videoResults = document.getElementById('videoResults');
-    const loadMoreButton = document.getElementById('loadMoreButton');
+  <div id="videoResults" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
 
-    function formatPublishedDate(dateStr) {
-      return new Date(dateStr).toLocaleDateString();
+  <div id="loadMoreContainer" class="text-center mt-8">
+    <button id="loadMoreButton" class="bg-gray-800 hover:bg-black text-white px-6 py-3 rounded-lg hidden">Load More</button>
+  </div>
+</div>
+
+<script>
+const API_KEYS = [
+  "AIzaSyAwtPbKNBMdL8jtWYqnEfDdXIrrzV20D8s",
+  "AIzaSyD4C8Sdj0vIJkpPwFpnDeQKzme_JuDQg3o"
+];
+
+let currentApiIndex = 0, nextPageToken = '', currentQuery = '', currentSort = 'relevance';
+let videoList = [], currentVideoIndex = -1;
+let isAutoPlayOn = false;
+let isMinimized = false;
+let ytPlayer = null;
+
+const videoResults = document.getElementById("videoResults");
+const searchInput = document.getElementById("searchInput");
+const searchButton = document.getElementById("searchButton");
+const loadMoreButton = document.getElementById("loadMoreButton");
+
+function createVideoCard(video, index) {
+  const { videoId } = video.id;
+  const { title, thumbnails, publishedAt, channelTitle } = video.snippet;
+  const likes = video.statistics?.likeCount || '—';
+  return `
+    <div class="video-card bg-white rounded-lg shadow-md">
+      <div class="video-thumbnail relative">
+        <img src="${thumbnails.medium.url}" alt="${title}" class="w-full h-48 object-cover" onclick="openVideoModal('${videoId}', ${index})">
+      </div>
+      <div class="p-4">
+        <h3 class="font-medium text-lg mb-1">${title}</h3>
+        <p class="text-sm text-gray-600">${new Date(publishedAt).toLocaleDateString()}</p>
+        <p class="text-sm text-gray-600">Channel: ${channelTitle}</p>
+        <p class="text-sm text-gray-600">Likes: ${likes}</p>
+      </div>
+    </div>`;
+}
+
+function renderVideos(videos) {
+  videos.forEach((v, i) => videoResults.insertAdjacentHTML("beforeend", createVideoCard(v, i)));
+}
+
+function clearResults() {
+  videoResults.innerHTML = '';
+  nextPageToken = '';
+  videoList = [];
+  currentVideoIndex = -1;
+}
+
+async function fetchVideos(query, token = '', retry = 0) {
+  const apiKey = API_KEYS[currentApiIndex];
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=${['likes','channel'].includes(currentSort)?'relevance':currentSort}&pageToken=${token}&key=${apiKey}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const ids = data.items.map(i => i.id.videoId).join(',');
+    const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${apiKey}`);
+    const statsData = await statsRes.json();
+
+    data.items.forEach((item, i) => item.statistics = statsData.items[i]?.statistics || {});
+    videoList = data.items;
+
+    if (currentSort === "likes") videoList.sort((a, b) => (b.statistics.likeCount || 0) - (a.statistics.likeCount || 0));
+    if (currentSort === "channel") videoList.sort((a, b) => a.snippet.channelTitle.localeCompare(b.snippet.channelTitle));
+
+    renderVideos(videoList);
+    nextPageToken = data.nextPageToken || '';
+    if (nextPageToken) loadMoreButton.classList.remove('hidden');
+  } catch (e) {
+    currentApiIndex = (currentApiIndex + 1) % API_KEYS.length;
+    if (retry < API_KEYS.length) fetchVideos(query, token, retry + 1);
+    else alert("All API keys failed.");
+  }
+}
+
+function handleSearch() {
+  const query = searchInput.value.trim();
+  if (!query) return;
+  currentQuery = query;
+  clearResults();
+  fetchVideos(query);
+}
+
+searchButton.onclick = handleSearch;
+searchInput.onkeypress = e => { if (e.key === 'Enter') handleSearch(); };
+loadMoreButton.onclick = () => fetchVideos(currentQuery, nextPageToken);
+document.getElementById("sortSelect").onchange = function () {
+  currentSort = this.value;
+  handleSearch();
+};
+
+document.getElementById("nightModeToggle").onclick = () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+};
+if (localStorage.getItem("darkMode") === "true") document.body.classList.add("dark-mode");
+
+// YouTube Iframe API global
+function onYouTubeIframeAPIReady() {}
+
+function openVideoModal(videoId, index = -1) {
+  closeVideoModal();
+  currentVideoIndex = index;
+  isMinimized = false;
+
+  const modal = document.createElement("div");
+  modal.id = "videoModal";
+  modal.className = "fixed bottom-4 right-4 w-80 h-60 bg-black z-50 rounded-lg overflow-hidden shadow-xl cursor-move";
+  modal.innerHTML = `
+    <div class="absolute top-1 right-1 flex gap-1 z-10">
+      <button onclick="toggleAutoplay()" id="autoplayBtn" class="text-white bg-blue-600 hover:bg-blue-700 rounded px-2 py-1 text-xs">${isAutoPlayOn ? '🔁 On' : '🔁 Off'}</button>
+      <button onclick="toggleMinimize()" class="text-white bg-green-600 hover:bg-green-700 rounded px-2 py-1 text-xs">🗕</button>
+      <button onclick="closeVideoModal()" class="text-white bg-red-600 hover:bg-red-700 rounded px-2 py-1 text-xs">✕</button>
+    </div>
+    <div id="player" class="w-full"></div>
+    <div class="flex justify-between items-center px-2 py-1 bg-gray-900 text-white text-xs absolute bottom-0 w-full z-20">
+      <button onclick="playPrevVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">⏮ Prev</button>
+      <span>Now Playing</span>
+      <button onclick="playNextVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">Next ⏭</button>
+    </div>`;
+  document.body.appendChild(modal);
+  makeDraggable(modal);
+
+  ytPlayer = new YT.Player('player', {
+    height: '100%',
+    width: '100%',
+    videoId: videoId,
+    playerVars: {
+      autoplay: 1,
+      rel: 0
+    },
+    events: {
+      'onStateChange': onPlayerStateChange
     }
+  });
+}
 
-    function createVideoCard(video, index) {
-      const videoId = video.id.videoId;
-      const title = video.snippet.title;
-      const thumbnail = video.snippet.thumbnails.medium.url;
-      return `
-        <div class="video-card bg-white rounded-lg shadow-md">
-          <div class="video-thumbnail relative">
-            <img src="${thumbnail}" alt="${title}" class="w-full h-48 object-cover" onclick="openVideoModal('${videoId}', ${index})">
-          </div>
-          <div class="p-4">
-            <h3 class="font-medium text-lg mb-1">${title}</h3>
-            <p class="text-sm text-gray-600">${formatPublishedDate(video.snippet.publishedAt)}</p>
-          </div>
-        </div>`;
+function onPlayerStateChange(event) {
+  if (event.data === YT.PlayerState.ENDED && isAutoPlayOn) {
+    playNextVideo();
+  }
+}
+
+function closeVideoModal() {
+  const modal = document.getElementById("videoModal");
+  if (modal) modal.remove();
+}
+
+function playNextVideo() {
+  if (currentVideoIndex < videoList.length - 1) {
+    openVideoModal(videoList[++currentVideoIndex].id.videoId, currentVideoIndex);
+  }
+}
+
+function playPrevVideo() {
+  if (currentVideoIndex > 0) {
+    openVideoModal(videoList[--currentVideoIndex].id.videoId, currentVideoIndex);
+  }
+}
+
+function toggleAutoplay() {
+  isAutoPlayOn = !isAutoPlayOn;
+  const btn = document.getElementById("autoplayBtn");
+  if (btn) btn.textContent = isAutoPlayOn ? "🔁 On" : "🔁 Off";
+}
+
+function toggleMinimize() {
+  const modal = document.getElementById("videoModal");
+  const player = document.getElementById("player");
+  if (!modal || !player) return;
+  isMinimized = !isMinimized;
+
+  if (isMinimized) {
+    modal.style.width = "220px";
+    modal.style.height = "160px";
+    modal.style.bottom = "10px";
+    modal.style.right = "10px";
+    player.style.height = "100px";
+  } else {
+    modal.style.width = "360px";
+    modal.style.height = "280px";
+    player.style.height = "180px";
+  }
+}
+
+function makeDraggable(el) {
+  let offsetX = 0, offsetY = 0, isDragging = false;
+  el.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    offsetX = e.clientX - el.offsetLeft;
+    offsetY = e.clientY - el.offsetTop;
+  });
+  document.addEventListener("mouseup", () => isDragging = false);
+  document.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+      el.style.left = `${e.clientX - offsetX}px`;
+      el.style.top = `${e.clientY - offsetY}px`;
+      el.style.bottom = 'auto';
+      el.style.right = 'auto';
     }
+  });
+}
 
-    function renderVideos(videos) {
-      videos.forEach((video, i) => {
-        const index = videoList.length;
-        videoList.push(video);
-        videoResults.insertAdjacentHTML('beforeend', createVideoCard(video, index));
-      });
-    }
-
-    function clearResults() {
-      videoResults.innerHTML = '';
-      nextPageToken = '';
-      videoList = [];
-      currentVideoIndex = -1;
-    }
-
-    async function fetchVideos(query, token = '') {
-      const apiKey = API_KEYS[currentApiIndex];
-      try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=${currentSort}&pageToken=${token}&key=${apiKey}`);
-        const data = await res.json();
-        if (data.items?.length) {
-          renderVideos(data.items);
-          nextPageToken = data.nextPageToken || '';
-          if (nextPageToken) loadMoreButton.classList.remove('hidden');
-        }
-      } catch (e) {
-        currentApiIndex = (currentApiIndex + 1) % API_KEYS.length;
-      }
-    }
-
-    function handleSearch() {
-      const query = searchInput.value.trim();
-      if (!query) return;
-      currentQuery = query;
-      clearResults();
-      fetchVideos(query);
-    }
-
-    searchButton.addEventListener('click', handleSearch);
-    searchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleSearch();
-    });
-    loadMoreButton.addEventListener('click', () => fetchVideos(currentQuery, nextPageToken));
-
-    function openVideoModal(videoId, index = -1) {
-      closeVideoModal();
-      currentVideoIndex = index;
-
-      const modalHtml = `
-        <div id="videoModal" class="fixed bottom-4 right-4 w-80 h-60 bg-black z-50 rounded-lg overflow-hidden shadow-xl draggable touch-none">
-          <div class="absolute top-1 right-1 flex gap-1 z-10">
-            <button onclick="toggleMinimizeVideoModal()" class="text-white bg-yellow-500 hover:bg-yellow-600 rounded px-2 py-1 text-xs">_</button>
-            <button onclick="closeVideoModal()" class="text-white bg-red-600 hover:bg-red-700 rounded px-2 py-1 text-xs">✕</button>
-          </div>
-          <iframe id="videoIframe" class="mt-6" width="100%" height="70%" src="https://www.youtube.com/embed/${videoId}?autoplay=1" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-          <div class="flex justify-between items-center px-2 py-1 bg-gray-900 text-white text-xs">
-            <button onclick="playPrevVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">⏮ Prev</button>
-            <span>Now Playing</span>
-            <button onclick="playNextVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">Next ⏭</button>
-          </div>
-        </div>`;
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      makeModalDraggable();
-      isMinimized = false;
-    }
-
-    function closeVideoModal() {
-      const modal = document.getElementById("videoModal");
-      if (modal) modal.remove();
-    }
-
-    function playNextVideo() {
-      if (currentVideoIndex < videoList.length - 1)
-        openVideoModal(videoList[++currentVideoIndex].id.videoId, currentVideoIndex);
-    }
-
-    function playPrevVideo() {
-      if (currentVideoIndex > 0)
-        openVideoModal(videoList[--currentVideoIndex].id.videoId, currentVideoIndex);
-    }
-
-    function toggleMinimizeVideoModal() {
-      const iframe = document.getElementById("videoIframe");
-      const modal = document.getElementById("videoModal");
-      if (!iframe || !modal) return;
-      if (!isMinimized) {
-        iframe.style.display = 'none';
-        modal.style.height = '40px';
-      } else {
-        iframe.style.display = 'block';
-        modal.style.height = '240px';
-      }
-      isMinimized = !isMinimized;
-    }
-
-    function makeModalDraggable() {
-      const modal = document.getElementById("videoModal");
-      let isDragging = false, offsetX, offsetY;
-
-      modal.addEventListener("mousedown", (e) => {
-        isDragging = true;
-        offsetX = e.clientX - modal.offsetLeft;
-        offsetY = e.clientY - modal.offsetTop;
-        modal.style.cursor = "move";
-      });
-
-      document.addEventListener("mousemove", (e) => {
-        if (isDragging) {
-          modal.style.left = `${e.clientX - offsetX}px`;
-          modal.style.top = `${e.clientY - offsetY}px`;
-          modal.style.bottom = "auto";
-          modal.style.right = "auto";
-        }
-      });
-
-      document.addEventListener("mouseup", () => {
-        isDragging = false;
-        modal.style.cursor = "default";
-      });
-
-      // Mobile touch support
-      modal.addEventListener("touchstart", (e) => {
-        isDragging = true;
-        const touch = e.touches[0];
-        offsetX = touch.clientX - modal.offsetLeft;
-        offsetY = touch.clientY - modal.offsetTop;
-      });
-
-      modal.addEventListener("touchmove", (e) => {
-        if (isDragging) {
-          const touch = e.touches[0];
-          modal.style.left = `${touch.clientX - offsetX}px`;
-          modal.style.top = `${touch.clientY - offsetY}px`;
-          modal.style.bottom = "auto";
-          modal.style.right = "auto";
-        }
-      });
-
-      modal.addEventListener("touchend", () => {
-        isDragging = false;
-      });
-    }
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") playNextVideo();
-      if (e.key === "ArrowLeft") playPrevVideo();
-      if (e.key === "Escape") closeVideoModal();
-    });
-
-    const nightModeToggle = document.getElementById('nightModeToggle');
-    nightModeToggle.addEventListener('click', () => {
-      document.body.classList.toggle('dark-mode');
-      nightModeToggle.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
-      localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-    });
-
-    if (localStorage.getItem('darkMode') === 'true') {
-      document.body.classList.add('dark-mode');
-      nightModeToggle.textContent = '☀️';
-    }
-  </script>
+document.onkeydown = e => {
+  if (e.key === "ArrowRight") playNextVideo();
+  if (e.key === "ArrowLeft") playPrevVideo();
+  if (e.key === "Escape") closeVideoModal();
+};
+</script>
 </body>
 </html>
-

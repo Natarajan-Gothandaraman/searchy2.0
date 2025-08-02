@@ -8,30 +8,21 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(120deg, #A50000, #FFD700);
-      color: #333;
-    }
+    body { font-family: 'Poppins', sans-serif; background: linear-gradient(120deg, #A50000, #FFD700); color: #333; }
     h1, p { color: white; }
-    body.dark-mode {
-      background: #1a1a2e;
-      color: #f5f5f5;
+    body.dark-mode { background: #1a1a2e; color: #f5f5f5; }
+    body.dark-mode input, body.dark-mode select { background-color: whitesmoke; color: black; }
+    body.dark-mode .video-card { background-color: #282828; color: #f5f5f5; }
+    body.dark-mode select option { color: black; }
+    .video-thumbnail:hover { transform: scale(1.03); }
+    @media (max-width: 640px) {
+      .mobile-controls { flex-direction: row; justify-content: center; gap: 0.75rem; }
     }
-    body.dark-mode input {
-      background-color: whitesmoke;
-      color: black;
-    }
-    body.dark-mode .video-card {
-      background-color: #282828;
-      color: #f5f5f5;
-    }
-    .video-thumbnail:hover {
-      transform: scale(1.03);
-    }
+    #videoModal { transition: all 0.3s ease-in-out; cursor: move; position: fixed; z-index: 50; }
   </style>
 </head>
 <body class="min-h-screen">
+
 <div class="container mx-auto px-4 py-8">
   <header class="mb-8 text-center relative">
     <h1 class="text-3xl font-bold mb-2">YouTube Video Search</h1>
@@ -45,15 +36,15 @@
     </div>
   </div>
 
-  <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6">
-    <button id="nightModeToggle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full">🌙</button>
+  <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6 mobile-controls">
+    <button id="nightModeToggle" class="w-10 h-10 flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full text-xl">🌙</button>
     <label for="sortSelect" class="text-white font-medium">Sort by:</label>
     <select id="sortSelect" class="px-4 py-2 rounded border border-gray-300">
       <option value="relevance">Relevance</option>
       <option value="viewCount">Views</option>
       <option value="date">Latest</option>
       <option value="likes">Likes</option>
-      <option value="channel">Channel A-Z</option>
+      <option value="channel">Channel A‑Z</option>
     </select>
   </div>
 
@@ -69,17 +60,14 @@ const API_KEYS = [
   "AIzaSyAwtPbKNBMdL8jtWYqnEfDdXIrrzV20D8s",
   "AIzaSyD4C8Sdj0vIJkpPwFpnDeQKzme_JuDQg3o"
 ];
-
 let currentApiIndex = 0, nextPageToken = '', currentQuery = '', currentSort = 'relevance';
-let videoList = [], currentVideoIndex = -1;
-let isAutoPlayOn = false;
-let isMinimized = false;
-let ytPlayer = null;
+let videoList = [], currentVideoIndex = -1, isAutoPlayOn = false, isMinimized = false, ytPlayer = null;
 
 const videoResults = document.getElementById("videoResults");
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const loadMoreButton = document.getElementById("loadMoreButton");
+const nightModeToggle = document.getElementById("nightModeToggle");
 
 function createVideoCard(video, index) {
   const { videoId } = video.id;
@@ -112,33 +100,39 @@ function clearResults() {
 
 async function fetchVideos(query, token = '', retry = 0) {
   const apiKey = API_KEYS[currentApiIndex];
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=${['likes','channel'].includes(currentSort)?'relevance':currentSort}&pageToken=${token}&key=${apiKey}`;
+  console.log(`Using API key #${currentApiIndex + 1}: ${apiKey}`);
+  const orderParam = ['likes','channel'].includes(currentSort) ? 'relevance' : currentSort;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&order=${orderParam}&pageToken=${token}&key=${apiKey}`;
+
   try {
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const ids = data.items.map(i => i.id.videoId).join(',');
     const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${ids}&key=${apiKey}`);
+    if (!statsRes.ok) throw new Error('Stats fetch failed');
     const statsData = await statsRes.json();
-
     data.items.forEach((item, i) => item.statistics = statsData.items[i]?.statistics || {});
     videoList = data.items;
 
-    if (currentSort === "likes") videoList.sort((a, b) => (b.statistics.likeCount || 0) - (a.statistics.likeCount || 0));
-    if (currentSort === "channel") videoList.sort((a, b) => a.snippet.channelTitle.localeCompare(b.snippet.channelTitle));
+    if (currentSort === "likes")
+      videoList.sort((a, b) => (b.statistics.likeCount || 0) - (a.statistics.likeCount || 0));
+    if (currentSort === "channel")
+      videoList.sort((a, b) => a.snippet.channelTitle.localeCompare(b.snippet.channelTitle));
 
     renderVideos(videoList);
     nextPageToken = data.nextPageToken || '';
     if (nextPageToken) loadMoreButton.classList.remove('hidden');
-  } catch (e) {
+  } catch (err) {
+    console.error(`API key #${currentApiIndex + 1} failed: ${err.message}`);
     currentApiIndex = (currentApiIndex + 1) % API_KEYS.length;
-    if (retry < API_KEYS.length) fetchVideos(query, token, retry + 1);
+    if (retry < API_KEYS.length - 1) await fetchVideos(query, token, retry + 1);
     else alert("All API keys failed.");
   }
 }
 
 function handleSearch() {
-  const query = searchInput.value.trim();
-  if (!query) return;
+  const query = searchInput.value.trim(); if (!query) return;
   currentQuery = query;
   clearResults();
   fetchVideos(query);
@@ -147,28 +141,28 @@ function handleSearch() {
 searchButton.onclick = handleSearch;
 searchInput.onkeypress = e => { if (e.key === 'Enter') handleSearch(); };
 loadMoreButton.onclick = () => fetchVideos(currentQuery, nextPageToken);
-document.getElementById("sortSelect").onchange = function () {
-  currentSort = this.value;
-  handleSearch();
-};
+document.getElementById("sortSelect").onchange = function () { currentSort = this.value; handleSearch(); };
 
-document.getElementById("nightModeToggle").onclick = () => {
+nightModeToggle.onclick = () => {
   document.body.classList.toggle("dark-mode");
-  localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+  const isDark = document.body.classList.contains("dark-mode");
+  localStorage.setItem("darkMode", isDark);
+  nightModeToggle.textContent = isDark ? "☀️" : "🌙";
 };
-if (localStorage.getItem("darkMode") === "true") document.body.classList.add("dark-mode");
+if (localStorage.getItem("darkMode") === "true") {
+  document.body.classList.add("dark-mode");
+  nightModeToggle.textContent = "☀️";
+}
 
-// YouTube Iframe API global
+// YouTube Iframe API
 function onYouTubeIframeAPIReady() {}
 
 function openVideoModal(videoId, index = -1) {
   closeVideoModal();
-  currentVideoIndex = index;
-  isMinimized = false;
-
+  currentVideoIndex = index; isMinimized = false;
   const modal = document.createElement("div");
   modal.id = "videoModal";
-  modal.className = "fixed bottom-4 right-4 w-80 h-60 bg-black z-50 rounded-lg overflow-hidden shadow-xl cursor-move";
+  modal.className = "fixed bottom-4 right-4 w-80 h-60 bg-black z-50 rounded-lg overflow-hidden shadow-xl";
   modal.innerHTML = `
     <div class="absolute top-1 right-1 flex gap-1 z-10">
       <button onclick="toggleAutoplay()" id="autoplayBtn" class="text-white bg-blue-600 hover:bg-blue-700 rounded px-2 py-1 text-xs">${isAutoPlayOn ? '🔁 On' : '🔁 Off'}</button>
@@ -177,90 +171,40 @@ function openVideoModal(videoId, index = -1) {
     </div>
     <div id="player" class="w-full"></div>
     <div class="flex justify-between items-center px-2 py-1 bg-gray-900 text-white text-xs absolute bottom-0 w-full z-20">
-      <button onclick="playPrevVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">⏮ Prev</button>
+      <button onclick="playPrevVideo()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">⏮ Prev</button>
       <span>Now Playing</span>
-      <button onclick="playNextVideo()" class="px-2 py-1 bg-gray-700 hover:bg-gray-800 rounded">Next ⏭</button>
+      <button onclick="playNextVideo()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">Next ⏭</button>
     </div>`;
   document.body.appendChild(modal);
   makeDraggable(modal);
-
-  ytPlayer = new YT.Player('player', {
-    height: '100%',
-    width: '100%',
-    videoId: videoId,
-    playerVars: {
-      autoplay: 1,
-      rel: 0
-    },
-    events: {
-      'onStateChange': onPlayerStateChange
-    }
-  });
+  ytPlayer = new YT.Player('player', { height: '100%', width: '100%', videoId, playerVars: { autoplay: 1, rel: 0 }, events: { 'onStateChange': onPlayerStateChange } });
 }
 
 function onPlayerStateChange(event) {
-  if (event.data === YT.PlayerState.ENDED && isAutoPlayOn) {
-    playNextVideo();
-  }
+  if (event.data === YT.PlayerState.ENDED && isAutoPlayOn) playNextVideo();
 }
-
-function closeVideoModal() {
-  const modal = document.getElementById("videoModal");
-  if (modal) modal.remove();
-}
-
-function playNextVideo() {
-  if (currentVideoIndex < videoList.length - 1) {
-    openVideoModal(videoList[++currentVideoIndex].id.videoId, currentVideoIndex);
-  }
-}
-
-function playPrevVideo() {
-  if (currentVideoIndex > 0) {
-    openVideoModal(videoList[--currentVideoIndex].id.videoId, currentVideoIndex);
-  }
-}
-
-function toggleAutoplay() {
-  isAutoPlayOn = !isAutoPlayOn;
-  const btn = document.getElementById("autoplayBtn");
-  if (btn) btn.textContent = isAutoPlayOn ? "🔁 On" : "🔁 Off";
-}
+function closeVideoModal() { document.getElementById("videoModal")?.remove(); }
+function playNextVideo() { if (currentVideoIndex < videoList.length - 1) openVideoModal(videoList[++currentVideoIndex].id.videoId, currentVideoIndex); }
+function playPrevVideo() { if (currentVideoIndex > 0) openVideoModal(videoList[--currentVideoIndex].id.videoId, currentVideoIndex); }
+function toggleAutoplay() { isAutoPlayOn = !isAutoPlayOn; document.getElementById("autoplayBtn").textContent = isAutoPlayOn ? "🔁 On" : "🔁 Off"; }
 
 function toggleMinimize() {
-  const modal = document.getElementById("videoModal");
-  const player = document.getElementById("player");
+  const modal = document.getElementById("videoModal"), player = document.getElementById("player");
   if (!modal || !player) return;
   isMinimized = !isMinimized;
-
   if (isMinimized) {
-    modal.style.width = "220px";
-    modal.style.height = "160px";
-    modal.style.bottom = "10px";
-    modal.style.right = "10px";
-    player.style.height = "100px";
+    modal.style.width = "220px"; modal.style.height = "160px"; modal.style.bottom = "10px"; modal.style.right = "10px"; modal.style.top = modal.style.left = ''; player.style.height = "100px";
   } else {
-    modal.style.width = "360px";
-    modal.style.height = "280px";
-    player.style.height = "180px";
+    modal.style.width = "360px"; modal.style.height = "280px"; modal.style.bottom = "4px"; modal.style.right = "4px"; player.style.height = "180px";
   }
 }
 
 function makeDraggable(el) {
   let offsetX = 0, offsetY = 0, isDragging = false;
-  el.addEventListener("mousedown", (e) => {
-    isDragging = true;
-    offsetX = e.clientX - el.offsetLeft;
-    offsetY = e.clientY - el.offsetTop;
-  });
+  el.addEventListener("mousedown", e => { isDragging = true; offsetX = e.clientX - el.offsetLeft; offsetY = e.clientY - el.offsetTop; });
   document.addEventListener("mouseup", () => isDragging = false);
-  document.addEventListener("mousemove", (e) => {
-    if (isDragging) {
-      el.style.left = `${e.clientX - offsetX}px`;
-      el.style.top = `${e.clientY - offsetY}px`;
-      el.style.bottom = 'auto';
-      el.style.right = 'auto';
-    }
+  document.addEventListener("mousemove", e => {
+    if (isDragging) { el.style.left = `${e.clientX - offsetX}px`; el.style.top = `${e.clientY - offsetY}px`; el.style.bottom = el.style.right = ''; }
   });
 }
 
@@ -270,5 +214,6 @@ document.onkeydown = e => {
   if (e.key === "Escape") closeVideoModal();
 };
 </script>
+
 </body>
 </html>

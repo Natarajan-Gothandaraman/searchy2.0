@@ -21,7 +21,7 @@
         }
         body.dark-mode input {
          background-color: black; /* Optional: Set a light background for the input field */
-}
+        }
         
         body.dark-mode .video-card {
             background-color: #282828;
@@ -148,8 +148,14 @@
     </div>
 
     <script>
-        // YouTube API Key (replace with your own)
-        const API_KEY = 'AIzaSyD4C8Sdj0vIJkpPwFpnDeQKzme_JuDQg3o';
+        // YouTube API Keys
+        const API_KEYS = [
+            'AIzaSyD4C8Sdj0vIJkpPwFpnDeQKzme_JuDQg3o',
+            'AIzaSyBYWdAvKHDJcj5X-VBc-Ob4tKepRx9IAk8',
+            'AIzaSyBAXzH-FPMCNgbC6skfqP0scZREjALh4u0',
+            'AIzaSyAwtPbKNBMdL8jtWYqnEfDdXIrrzV20D8s'
+        ];
+        let currentApiIndex = 0;
         let nextPageToken = '';
         let currentQuery = '';
         let currentSort = 'relevance';
@@ -197,23 +203,6 @@
             const thumbnail = video.snippet.thumbnails.medium.url;
             const publishedAt = video.snippet.publishedAt;
             
-            // Check for restricted content
-            if (video.contentDetails && video.contentDetails.contentRating.ytRating === 'ytAgeRestricted') {
-                return `
-                    <div class="video-card bg-[#282828] rounded-lg overflow-hidden shadow-md">
-                        <div class="p-4 text-center">
-                            <div class="text-red-500 mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <h3 class="font-medium text-white mb-1">Restricted Content</h3>
-                            <p class="text-gray-400 text-sm">This video is restricted in Restricted Mode</p>
-                        </div>
-                    </div>
-                `;
-            }
-            
             return `
                 <div class="video-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                     <div class="video-thumbnail relative overflow-hidden">
@@ -247,6 +236,7 @@
         
         // Fetch videos from YouTube API
         async function fetchVideos(query, pageToken = '', sort = 'relevance') {
+            const apiKey = API_KEYS[currentApiIndex];
             try {
                 loadingSpinner.style.display = 'block';
                 loadMoreButton.classList.add('hidden');
@@ -255,12 +245,13 @@
                     `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}` +
                     `&type=video&maxResults=12&order=${sort}` +
                     `&pageToken=${pageToken}&safeSearch=strict` +
-                    `&key=${API_KEY}`
+                    `&key=${apiKey}`
                 );
                 
                 const data = await response.json();
                 
                 if (data.items && data.items.length > 0) {
+                    console.log(`Using API Key: ${apiKey}`); // Log the working API key
                     renderVideos(data.items);
                     nextPageToken = data.nextPageToken || '';
                     
@@ -282,6 +273,10 @@
                 console.error('Error fetching videos:', error);
                 loadingSpinner.style.display = 'none';
                 loadMoreButton.classList.add('hidden');
+                
+                // Switch to the next API key
+                currentApiIndex = (currentApiIndex + 1) % API_KEYS.length;
+                console.warn(`Switching to API Key: ${API_KEYS[currentApiIndex]}`);
                 
                 if (videoResults.innerHTML === '') {
                     emptyState.style.display = 'block';
@@ -415,4 +410,3 @@
     </script>
 </body>
 </html>
-

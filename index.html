@@ -18,7 +18,12 @@
     @media (max-width: 640px) {
       .mobile-controls { flex-direction: row; justify-content: center; gap: 0.75rem; }
     }
-    #videoModal { transition: all 0.3s ease-in-out; cursor: move; position: fixed; z-index: 50; }
+    #videoModal {
+      transition: all 0.3s ease-in-out;
+      cursor: move;
+      position: fixed;
+      z-index: 50;
+    }
   </style>
 </head>
 <body class="min-h-screen">
@@ -199,13 +204,54 @@ function toggleMinimize() {
   }
 }
 
+// 🟢 DRAG SUPPORT (desktop + mobile)
 function makeDraggable(el) {
   let offsetX = 0, offsetY = 0, isDragging = false;
-  el.addEventListener("mousedown", e => { isDragging = true; offsetX = e.clientX - el.offsetLeft; offsetY = e.clientY - el.offsetTop; });
-  document.addEventListener("mouseup", () => isDragging = false);
-  document.addEventListener("mousemove", e => {
-    if (isDragging) { el.style.left = `${e.clientX - offsetX}px`; el.style.top = `${e.clientY - offsetY}px`; el.style.bottom = el.style.right = ''; }
+
+  el.addEventListener("mousedown", e => {
+    isDragging = true;
+    offsetX = e.clientX - el.offsetLeft;
+    offsetY = e.clientY - el.offsetTop;
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   });
+
+  const onMouseMove = e => {
+    if (!isDragging) return;
+    el.style.left = `${e.clientX - offsetX}px`;
+    el.style.top = `${e.clientY - offsetY}px`;
+    el.style.bottom = el.style.right = '';
+  };
+
+  const onMouseUp = () => {
+    isDragging = false;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+  };
+
+  el.addEventListener("touchstart", e => {
+    isDragging = true;
+    const touch = e.touches[0];
+    offsetX = touch.clientX - el.offsetLeft;
+    offsetY = touch.clientY - el.offsetTop;
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+  });
+
+  const onTouchMove = e => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    el.style.left = `${touch.clientX - offsetX}px`;
+    el.style.top = `${touch.clientY - offsetY}px`;
+    el.style.bottom = el.style.right = '';
+    e.preventDefault();
+  };
+
+  const onTouchEnd = () => {
+    isDragging = false;
+    document.removeEventListener("touchmove", onTouchMove);
+    document.removeEventListener("touchend", onTouchEnd);
+  };
 }
 
 document.onkeydown = e => {

@@ -37,7 +37,7 @@
 <body class="min-h-screen">
 
 <!-- ✅ History Button -->
-<button id="historyToggle" onclick="toggleHistoryPanel()" class="static top-1 right-2  z-50 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-3 py-1 rounded text-sm">History</button>
+<button id="historyToggle" onclick="toggleHistoryPanel()" class="static top-1 right-2 z-50 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-3 py-1 rounded text-sm">History</button>
 
 <!-- ✅ History Panel -->
 <div id="historyPanel" class="fixed top-0 right-0 w-72 h-full bg-white dark-mode:bg-gray-800 text-black dark-mode:text-white shadow-lg transform translate-x-full transition-transform duration-300 z-40 overflow-y-auto overscroll-contain">
@@ -89,6 +89,7 @@ const API_KEYS = [
 ];
 let currentApiIndex = 0, nextPageToken = '', currentQuery = '', currentSort = 'relevance';
 let videoList = [], currentVideoIndex = -1, isAutoPlayOn = false, isMinimized = false, ytPlayer = null;
+let prevModalPosition = null;
 
 const videoResults = document.getElementById("videoResults");
 const searchInput = document.getElementById("searchInput");
@@ -193,26 +194,23 @@ function openVideoModal(videoId, index = -1, title = '') {
   const modal = document.createElement("div");
   modal.id = "videoModal";
   modal.className = "w-80 h-60 bg-black rounded-lg overflow-hidden shadow-xl";
-
-  // ✅ Position modal at bottom center
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  const modalW = 360;
-  const modalH = 280;
-  modal.style.left = `${(screenW - modalW) / 2}px`;
-  modal.style.top = `${screenH - modalH - 20}px`;
-  modal.style.position = "fixed";
+  modal.style.left = `${(screenW - 360) / 2}px`;
+  modal.style.top = `${screenH - 280 - 20}px`;
 
   modal.innerHTML = `
     <div class="absolute top-1 right-1 flex gap-1 z-10">
       <button onclick="toggleAutoplay()" id="autoplayBtn" class="text-white bg-blue-600 hover:bg-blue-700 rounded px-2 py-1 text-xs">${isAutoPlayOn ? '🔁 On' : '🔁 Off'}</button>
-      <button onclick="toggleMinimize()" class="text-white bg-green-600 hover:bg-green-700 rounded px-2 py-1 text-xs">🗕</button>
       <button onclick="closeVideoModal()" class="text-white bg-red-600 hover:bg-red-700 rounded px-2 py-1 text-xs">✕</button>
     </div>
     <div id="player" class="w-full"></div>
     <div class="flex justify-between items-center px-2 py-1 bg-gray-900 text-white text-xs absolute bottom-0 w-full z-20">
-      <button onclick="playPrevVideo()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">⏮ Prev</button>
-      <span>Now Playing</span>
+      <div class="flex gap-1">
+        <button onclick="playPrevVideo()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">⏮ Prev</button>
+        <button onclick="togglePlayPause()" id="pausePlayBtn" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">⏸ Pause</button>
+        <button onclick="toggleFullscreen()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">⛶ Fullscreen</button>
+      </div>
       <button onclick="playNextVideo()" class="bg-gray-700 hover:bg-gray-800 rounded px-2 py-1">Next ⏭</button>
     </div>`;
   document.body.appendChild(modal);
@@ -234,14 +232,40 @@ function playNextVideo() { if (currentVideoIndex < videoList.length - 1) openVid
 function playPrevVideo() { if (currentVideoIndex > 0) openVideoModal(videoList[--currentVideoIndex].id.videoId, currentVideoIndex, videoList[currentVideoIndex].snippet.title); }
 function toggleAutoplay() { isAutoPlayOn = !isAutoPlayOn; document.getElementById("autoplayBtn").textContent = isAutoPlayOn ? "🔁 On" : "🔁 Off"; }
 
-function toggleMinimize() {
-  const modal = document.getElementById("videoModal"), player = document.getElementById("player");
-  if (!modal || !player) return;
-  isMinimized = !isMinimized;
-  if (isMinimized) {
-    modal.style.width = "220px"; modal.style.height = "160px"; player.style.height = "100px";
+function togglePlayPause() {
+  const btn = document.getElementById('pausePlayBtn');
+  if (!ytPlayer) return;
+  const state = ytPlayer.getPlayerState();
+  if (state === YT.PlayerState.PLAYING) {
+    ytPlayer.pauseVideo();
+    btn.textContent = '▶️ Play';
   } else {
-    modal.style.width = "360px"; modal.style.height = "280px"; player.style.height = "180px";
+    ytPlayer.playVideo();
+    btn.textContent = '⏸ Pause';
+  }
+}
+
+function toggleFullscreen() {
+  const modal = document.getElementById('videoModal');
+  if (!modal) return;
+  if (!document.fullscreenElement) {
+    prevModalPosition = {
+      left: modal.style.left,
+      top: modal.style.top,
+      width: modal.style.width,
+      height: modal.style.height
+    };
+    modal.requestFullscreen().catch(err => console.error(err));
+  } else {
+    document.exitFullscreen().then(() => {
+      if (prevModalPosition) {
+        modal.style.left = prevModalPosition.left;
+        modal.style.top = prevModalPosition.top;
+        modal.style.width = prevModalPosition.width;
+        modal.style.height = prevModalPosition.height;
+        prevModalPosition = null;
+      }
+    }).catch(err => console.error(err));
   }
 }
 
@@ -265,27 +289,6 @@ function makeDraggable(el) {
     document.removeEventListener("mousemove", onMouseMove);
     document.removeEventListener("mouseup", onMouseUp);
   }
-  el.addEventListener("touchstart", e => {
-    isDragging = true;
-    const touch = e.touches[0];
-    offsetX = touch.clientX - el.offsetLeft;
-    offsetY = touch.clientY - el.offsetTop;
-    document.addEventListener("touchmove", onTouchMove, { passive: false });
-    document.addEventListener("touchend", onTouchEnd);
-  });
-  function onTouchMove(e) {
-    if (!isDragging) return;
-    const touch = e.touches[0];
-    el.style.left = `${touch.clientX - offsetX}px`;
-    el.style.top = `${touch.clientY - offsetY}px`;
-    el.style.bottom = el.style.right = '';
-    e.preventDefault();
-  }
-  function onTouchEnd() {
-    isDragging = false;
-    document.removeEventListener("touchmove", onTouchMove);
-    document.removeEventListener("touchend", onTouchEnd);
-  }
 }
 
 document.onkeydown = e => {
@@ -297,7 +300,6 @@ document.onkeydown = e => {
   }
 };
 
-// ✅ History Functions
 function toggleHistoryPanel() {
   const panel = document.getElementById("historyPanel");
   panel.classList.toggle("translate-x-full");
@@ -310,47 +312,50 @@ function saveSearchQuery(query) {
   const keys = Object.keys(history);
   if (keys.length > 10) delete history[keys[0]];
   localStorage.setItem("searchHistory", JSON.stringify(history));
-  renderHistory();
+  updateHistoryPanel();
 }
 
-function saveVideoToHistory(query, title, videoId) {
+function saveVideoToHistory(query, title, id) {
   let history = JSON.parse(localStorage.getItem("searchHistory")) || {};
   if (!history[query]) history[query] = [];
-  if (!history[query].some(v => v.videoId === videoId)) {
-    history[query].push({ title, videoId });
+  if (!history[query].some(v => v.id === id)) {
+    history[query].unshift({ title, id });
+    if (history[query].length > 5) history[query].pop();
     localStorage.setItem("searchHistory", JSON.stringify(history));
-    renderHistory();
+    updateHistoryPanel();
   }
 }
 
-function renderHistory() {
-  const container = document.getElementById("historyList");
+function updateHistoryPanel() {
   const history = JSON.parse(localStorage.getItem("searchHistory")) || {};
-  container.innerHTML = Object.entries(history).reverse().map(([query, videos]) => {
-    const videoList = videos.map(v => `<li class="ml-4 text-blue-600 underline cursor-pointer" onclick="openVideoModal('${v.videoId}', -1, '${escapeHtml(v.title)}')">${v.title}</li>`).join("");
-    return `<div><h3 class="font-semibold">${query}</h3><ul class="list-disc">${videoList}</ul></div>`;
-  }).join("");
+  const container = document.getElementById("historyList");
+  container.innerHTML = "";
+  Object.entries(history).forEach(([query, videos]) => {
+    const section = document.createElement("div");
+    section.innerHTML = `<h3 class="font-semibold mb-1">${query}</h3><ul class="list-disc ml-4 space-y-1"></ul>`;
+    const ul = section.querySelector("ul");
+    videos.forEach(video => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="javascript:void(0)" onclick="openVideoModal('${video.id}', -1, '${escapeHtml(video.title)}')">${video.title}</a>`;
+      ul.appendChild(li);
+    });
+    container.appendChild(section);
+  });
 }
+function clearHistory() { localStorage.removeItem("searchHistory"); updateHistoryPanel(); }
+window.onload = updateHistoryPanel;
 
-function clearHistory() {
-  localStorage.removeItem("searchHistory");
-  renderHistory();
-}
-
-renderHistory();
-
-// ✅ Auto-close history panel
-document.addEventListener("click", (e) => {
+// ✅ Added: Hide history panel when clicking outside
+document.addEventListener("mousedown", function (event) {
   const panel = document.getElementById("historyPanel");
   const toggleBtn = document.getElementById("historyToggle");
   if (!panel.classList.contains("translate-x-full") &&
-      !panel.contains(e.target) &&
-      !toggleBtn.contains(e.target)) {
+      !panel.contains(event.target) &&
+      !toggleBtn.contains(event.target)) {
     panel.classList.add("translate-x-full");
     toggleBtn.style.display = "block";
   }
 });
 </script>
-
 </body>
 </html>
